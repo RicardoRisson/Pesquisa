@@ -4,6 +4,7 @@ from utils import save_checkpoint, save_jsonl_async, load_checkpoint, hash_text
 from pubmed.fetcher import fetch_pubmed
 from scielo.fetcher import fetch_scielo
 from arxiv_local.fetcher import fetch_arxiv
+from openalex.fetcher import fetch_openalex
 import os
 from dotenv import load_dotenv
 
@@ -11,13 +12,10 @@ load_dotenv()
 QUERIES = [q.strip() for q in os.getenv("QUERIES", "").split(",") if q.strip()]
 
 FETCHERS = {
-    "pubmed": lambda q, checkpoint: asyncio.get_event_loop().run_in_executor(
-        None, fetch_pubmed, q, checkpoint
-    ),
-    "scielo": lambda q, checkpoint: fetch_scielo(q),
-    "arxiv":  lambda q, checkpoint: asyncio.get_event_loop().run_in_executor(
-        None, fetch_arxiv, q, checkpoint
-    ),
+    "pubmed":    lambda q, cp: asyncio.get_event_loop().run_in_executor(None, fetch_pubmed, q, cp),
+    "scielo":    lambda q, cp: fetch_scielo(q),
+    "arxiv":     lambda q, cp: asyncio.get_event_loop().run_in_executor(None, fetch_arxiv, q, cp),
+    "openalex":  lambda q, cp: asyncio.get_event_loop().run_in_executor(None, fetch_openalex, q, cp),
 }
 
 def parse_args():

@@ -87,7 +87,6 @@ def fetch_openalex(query: str, checkpoint: dict) -> list[dict]:
 
             total_fetched += len(works)
 
-            # cursor-based pagination — sem cursor próximo significa última página
             next_cursor = data.get("meta", {}).get("next_cursor")
             if not next_cursor:
                 break
