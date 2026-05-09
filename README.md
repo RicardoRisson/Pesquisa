@@ -1,6 +1,6 @@
-# Pesquisa — Physiology Abstract Scraper
+# Pesquisa — Abstract Scraper
 
-A research data pipeline that collects, deduplicates, and classifies scientific abstracts from **PubMed** and **SciELO** across multiple languages.
+A research data pipeline that collects, deduplicates, and classifies scientific abstracts from **PubMed**, **ArXiV** and **SciELO** across multiple languages.
 
 ---
 
@@ -9,14 +9,14 @@ A research data pipeline that collects, deduplicates, and classifies scientific 
 The pipeline runs queries against two sources in parallel, extracts multilingual abstracts, deduplicates by article ID, and normalizes language labels into a clean JSONL dataset.
 
 ```
-queries.py → pub_getter.py ─┬─ pubmed_fetcher.py  → PubMed API (Entrez)
-                            └─ scielo_fetcher.py  → SciELO (Playwright + aiohttp)
+.env: queries = ... → fetch.py ─┬─ pubmed.fetcher.py  → PubMed API (Entrez)
+                            └─ scielo.fetcher.py  → SciELO (Playwright + aiohttp)
                                       ↓
-                               data/output.jsonl
+                               data/dataset_clean.jsonl
                                       ↓
                             tools/classify.py
                                       ↓
-                        data/output_clean.jsonl + data/report.json
+                        data/dataset_clean.jsonl + data/report.json
 ```
 
 ---
@@ -26,14 +26,16 @@ queries.py → pub_getter.py ─┬─ pubmed_fetcher.py  → PubMed API (Entrez
 ```
 .
 ├── data/
-│   ├── output.jsonl          # raw collected abstracts
-│   ├── output_clean.jsonl    # deduplicated and classified
+│   ├── dataset_raw.jsonl     # raw collected abstracts
+│   ├── dataset_clean.jsonl   # deduplicated and classified
 │   └── report.json           # run statistics
 ├── pubmed/
-│   ├── pubmed_fetcher.py     # Entrez batch fetcher
+│   ├── fetcher.py            # Entrez batch fetcher
 │   └── utils.py              # abstract extraction, language normalization
+├── arxiv_local/
+│   ├── fetcher.py            # Arxiv API batch fetcher
 ├── scielo/
-│   ├── scielo_fetcher.py     # Playwright + aiohttp scraper
+│   ├── fetcher.py            # Playwright + aiohttp scraper
 │   ├── block_guard.py        # retry logic, block detection, headers
 │   ├── cookie.py             # Playwright-based cookie refresh
 │   └── utils.py              # abstract splitting, PID extraction
@@ -41,12 +43,12 @@ queries.py → pub_getter.py ─┬─ pubmed_fetcher.py  → PubMed API (Entrez
 │   └── langs.py              # unified language code/name mappings
 ├── tools/
 │   └── classify.py           # dedup + language classification
-├── utils/
-│   └── logger.py             # verbosity-aware logger
-├── pub_getter.py             # entrypoint — runs both fetchers in parallel
-├── queries.py                # loads QUERIES from .env
+├── fetch.py                  # fetch — runs chosen fetchers in parallel
+├── classify.py               # classify — classify data by queries
+├── to_csv.py                 # convert selected file to csv
 ├── utils.py                  # checkpoint, JSONL save, hashing
 ├── .env                      # secrets and config (never committed)
+├── requirements.txt          # all needed libs
 └── .gitignore
 ```
 
@@ -57,8 +59,7 @@ queries.py → pub_getter.py ─┬─ pubmed_fetcher.py  → PubMed API (Entrez
 **Requirements**: Python 3.11+
 
 ```bash
-pip install aiohttp aiofiles beautifulsoup4 biopython playwright python-dotenv tqdm lxml Brotli
-playwright install chromium
+pip install -r requirements.txt
 ```
 
 **Configure `.env`:**
@@ -67,8 +68,7 @@ playwright install chromium
 ENTREZ_EMAIL=your@email.com
 ENTREZ_API_KEY=your_ncbi_key        # optional — raises rate limit from 3 to 10 req/s
 SCIELO_COOKIE=                      # auto-populated on first run
-QUERIES=renal physiology,cardiovascular physiology,respiratory physiology
-VERBOSE=0                           # set to 1 for per-page debug output
+QUERIES=renal physiology,...        # example, populate with your queries
 ```
 
 ---
@@ -78,18 +78,18 @@ VERBOSE=0                           # set to 1 for per-page debug output
 **Run the full pipeline:**
 
 ```bash
-python pub_getter.py
+python fetch.py
 ```
 
-Fetches all queries from both sources in parallel, saves results to `data/output.jsonl`, and checkpoints progress so interrupted runs resume where they left off.
+Fetches all queries from both sources in parallel, saves results to `data/dataset_raw.jsonl`, and checkpoints progress so interrupted runs resume where they left off.
 
 **Classify and deduplicate:**
 
 ```bash
-python -m tools.classify
+python classify.py
 ```
 
-Reads `data/output.jsonl`, removes duplicate IDs, normalizes language labels, and writes `data/output_clean.jsonl` and `data/report.json`.
+Reads `data/dataset_raw.jsonl`, removes duplicate IDs, normalizes language labels, and writes files classified by queries in `data/classified/` and `data/report.json`.
 
 ---
 
@@ -120,13 +120,35 @@ Each line in the output JSONL is one article:
 
 ```json
 {
-  "total_raw": 10000,
-  "total_after_dedup": 9200,
-  "duplicates_removed": 800,
-  "multilingual_entries": 3400,
-  "by_source": { "scielo": 6000, "pubmed": 3200 },
-  "by_language": { "english": 8500, "portuguese": 3200, "spanish": 2100 }
-}
+  "total_raw": 79840,
+  "total_after_dedup": 79123,
+  "duplicates_removed": 717,
+  "multilingual_entries": 636,
+  "by_query": {
+    "cardiovascular physiology": 9274,
+    "cellular physiology": 8857,
+    "digestive physiology": 9534,
+    "endocrine physiology": 7908,
+    "general physiology": 6729,
+    "nervous physiology": 9058,
+    "renal physiology": 9671,
+    "reproductive physiology": 8637,
+    "respiratory physiology": 9455
+  },
+  "by_source": {
+    "pubmed": 78248,
+    "scielo": 875
+  },
+  "by_language": {
+    "english": 77549,
+    "chinese": 785,
+    "spanish": 478,
+    "portuguese": 305,
+  },
+  "duplicate_ids": [
+    "42104836",
+    "42104080",
+  ]
 ```
 
 ---
@@ -159,6 +181,7 @@ Progress is saved after each query to a checkpoint file. Re-running the pipeline
 
 ## Notes
 
-- PubMed fetches up to 1000 results per query in batches of 200 via the Entrez API
+- PubMed fetches up to 20000 results per query in batches of 200 via the Entrez API
+- Arxiv fetches up to 20000 results per query in batches of 100 via the Arxiv API
 - SciELO paginates until a page returns 0 results
 - A free NCBI API key is recommended — get one at [ncbi.nlm.nih.gov/account](https://www.ncbi.nlm.nih.gov/account/)
