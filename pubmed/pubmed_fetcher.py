@@ -19,8 +19,6 @@ REQUEST_DELAY = 0.11 if api_key else 0.34  # 10 req/s with key, 3 req/s without
 
 
 def fetch_pubmed(query, checkpoint):
-    print(f"[PubMed] {query}")
-
     handle = Entrez.esearch(db="pubmed", term=query, retmax=MAX_PUBMED)
     ids = Entrez.read(handle)["IdList"]
     ids = [pmid for pmid in ids if pmid not in checkpoint["done_ids"]]
@@ -31,7 +29,7 @@ def fetch_pubmed(query, checkpoint):
     results = []
 
     # batch into chunks of 200
-    for i in tqdm(range(0, len(ids), BATCH_SIZE)):
+    for i in tqdm(range(0, len(ids), BATCH_SIZE),desc=f"[PubMed] {query}", unit="art"):
         batch = ids[i:i + BATCH_SIZE]
 
         try:

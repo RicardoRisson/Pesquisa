@@ -27,7 +27,6 @@ async def main():
             item_hash = hash_text(item["id"])
 
             if item_hash in checkpoint["done_ids"]:
-                print(f"[SKIP] {item['source']} | {item['title'][:60]}")
                 continue
 
             await save_jsonl_async(item)

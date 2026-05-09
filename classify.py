@@ -2,27 +2,8 @@
 import json
 from pathlib import Path
 from collections import defaultdict
-
 from shared.langs import normalize_lang_key
-
-INPUT_FILE  = "data/output.jsonl"
-OUTPUT_FILE = "data/output_clean.jsonl"
-REPORT_FILE = "data/report.json"
-
-
-def load_jsonl(path: str) -> list[dict]:
-    entries = []
-    with open(path, "r", encoding="utf-8") as f:
-        for i, line in enumerate(f, 1):
-            line = line.strip()
-            if not line:
-                continue
-            try:
-                entries.append(json.loads(line))
-            except json.JSONDecodeError as e:
-                print(f"[WARN] Line {i} is malformed, skipping: {e}")
-    return entries
-
+from utils import load_jsonl, RAW_FILE, CLEAN_FILE, REPORT_FILE
 
 def dedup(entries: list[dict]) -> tuple[list[dict], list[dict]]:
     seen = {}
@@ -79,8 +60,8 @@ def build_report(original, deduped, dupes) -> dict:
 
 
 def main():
-    print(f"[Classify] Loading {INPUT_FILE}...")
-    entries = load_jsonl(INPUT_FILE)
+    print(f"[Classify] Loading {RAW_FILE}...")
+    entries = load_jsonl(RAW_FILE)
     print(f"[Classify] Loaded {len(entries)} entries")
 
     deduped, dupes = dedup(entries)
@@ -88,9 +69,9 @@ def main():
 
     classified = [classify_languages(e) for e in deduped]
 
-    Path(OUTPUT_FILE).parent.mkdir(parents=True, exist_ok=True)
+    Path(CLEAN_FILE).parent.mkdir(parents=True, exist_ok=True)
 
-    with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
+    with open(CLEAN_FILE, "w", encoding="utf-8") as f:
         for entry in classified:
             f.write(json.dumps(entry, ensure_ascii=False) + "\n")
 
@@ -98,7 +79,7 @@ def main():
     with open(REPORT_FILE, "w", encoding="utf-8") as f:
         json.dump(report, f, indent=2, ensure_ascii=False)
 
-    print(f"[Classify] Done → {OUTPUT_FILE}")
+    print(f"[Classify] Done → {CLEAN_FILE}")
     print(f"[Classify] Report:")
     print(json.dumps(report, indent=2))
 

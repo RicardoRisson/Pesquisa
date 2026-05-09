@@ -2,7 +2,10 @@ import aiofiles
 import json
 import hashlib
 
-OUTPUT_FILE = "datasets/dataset_raw.jsonl"
+
+CLEAN_FILE = "data/dataset_clean.jsonl"
+REPORT_FILE = "data/report.json"
+RAW_FILE = "data/dataset_raw.jsonl"
 CHECKPOINT_FILE = "logs/checkpoint.json"
 LOG_FILE = "logs/pipeline_log.jsonl"
 
@@ -23,8 +26,21 @@ def save_checkpoint(state):
         json.dump(state, f)
 
 async def save_jsonl_async(data):
-    async with aiofiles.open(OUTPUT_FILE, "a", encoding="utf-8") as f:
+    async with aiofiles.open(RAW_FILE, "a", encoding="utf-8") as f:
         await f.write(json.dumps(data, ensure_ascii=False) + "\n")
+
+def load_jsonl(path: str) -> list[dict]:
+    entries = []
+    with open(path, "r", encoding="utf-8") as f:
+        for i, line in enumerate(f, 1):
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                entries.append(json.loads(line))
+            except json.JSONDecodeError as e:
+                print(f"[WARN] Line {i} is malformed, skipping: {e}")
+    return entries
 
 def load_checkpoint():
     try:

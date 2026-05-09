@@ -4,6 +4,7 @@ import random
 import asyncio
 import aiohttp
 import urllib.parse
+from tqdm import tqdm
 from bs4 import BeautifulSoup
 from collections import defaultdict
 from playwright.async_api import async_playwright, BrowserContext
@@ -84,7 +85,6 @@ async def fetch_scielo_article(session, url, semaphore, stats):
 
 
 async def fetch_scielo(query: str) -> list:
-    print(f"[SciELO] {query}")
 
     # ensure we have a valid cookie before starting
     if not os.getenv("SCIELO_COOKIE"):
@@ -105,93 +105,93 @@ async def fetch_scielo(query: str) -> list:
         browser, context = await make_playwright_context(playwright)
 
         try:
-            while True:
-                params = {
-                    "q": query,
-                    "lang": "en",
-                    "count": 20,
-                    "from": (page - 1) * 20,
-                    "format": "abstract",
-                }
+            with tqdm(desc=f"[SciELO] {query}", unit="art") as pbar:
+                while True:
+                    params = {
+                        "q": query,
+                        "lang": "en",
+                        "count": 20,
+                        "from": (page - 1) * 20,
+                        "format": "abstract",
+                    }
 
-                html = await fetch_search_page(context, params)
+                    html = await fetch_search_page(context, params)
 
-                if not html:
-                    print(f"[SciELO] No HTML on page {page}, stopping")
-                    break
-
-                if is_blocked(html):
-                    block_retries += 1
-                    print(f"[SciELO] Block on page {page} (attempt {block_retries}/{MAX_BLOCK_RETRIES}), refreshing cookie...")
-                    await log_event({"event": "scielo_block", "page": page, "query": query, "attempt": block_retries})
-
-                    if block_retries >= MAX_BLOCK_RETRIES:
-                        print(f"[SciELO] Too many blocks, aborting query: {query}")
+                    if not html:
+                        await log_event({"event": "scielo_search", "status": "no_html"})
                         break
 
-                    # close current browser context and get a fresh cookie
-                    await browser.close()
-                    await refresh_scielo_cookie()
-                    await asyncio.sleep(random.uniform(10, 20))
-                    browser, context = await make_playwright_context(playwright)
-                    continue  # retry same page
+                    if is_blocked(html):
+                        block_retries += 1
+                        await log_event({"event": "scielo_block", "page": page, "query": query, "attempt": block_retries})
 
-                block_retries = 0  # reset on success
+                        if block_retries >= MAX_BLOCK_RETRIES:
+                            await log_event({"event": "scielo_max_retries", "page": page, "query": query})
+                            break
 
-                soup = BeautifulSoup(html, "lxml")
-                articles = soup.select("div.results div.item")
-                print(f"[SciELO] Page {page}: {len(articles)} articles")
+                        # close current browser context and get a fresh cookie
+                        await browser.close()
+                        await refresh_scielo_cookie()
+                        await asyncio.sleep(random.uniform(10, 20))
+                        browser, context = await make_playwright_context(playwright)
+                        continue  # retry same page
 
-                if not articles:
-                    with open("scielo/debug/scielo_debug.html", "w", encoding="utf-8") as f:
-                        f.write(html)
-                    print(f"[SciELO] No articles on page {page}, done")
-                    break
+                    block_retries = 0  # reset on success
 
-                if len(articles) < 5:
-                    consecutive_empties += 1
-                    delay = random.uniform(3.0, 6.0) * consecutive_empties
-                else:
-                    consecutive_empties = 0
-                    delay = random.uniform(1.0, 2.5)
+                    soup = BeautifulSoup(html, "lxml")
+                    articles = soup.select("div.results div.item")
 
-                for art in articles:
-                    a = art.find("a", title=True)
-                    if not a:
-                        continue
+                    if not articles:
+                        with open("scielo/debug/scielo_debug.html", "w", encoding="utf-8") as f:
+                            f.write(html)
+                        await log_event({"event": "scielo_no_articles", "page": page, "query": query})    
+                        break
 
-                    href = a.get("href", "")
-                    if not href:
-                        continue
-
-                    link = href if href.startswith("http") else f"https://search.scielo.org{href}"
-                    title_tag = a.find("strong", class_="title")
-                    title = title_tag.get_text(strip=True) if title_tag else a.get("title", "").strip()
-
-                    source_div = art.select_one("div.source")
-                    abstract_div = source_div.find_next_sibling("div", class_=False) if source_div else None
-                    inline_abstract = abstract_div.get_text(strip=True) if abstract_div else None
-
-                    stats["total"] += 1
-
-                    if inline_abstract:
-                        stats["inline_abstract"] += 1
-                        results.append({
-                            "source": "scielo",
-                            "query": query,
-                            "id": extract_pid(link),
-                            "url": link,
-                            "title": title,
-                            "abstracts": split_abstract_by_language(inline_abstract),
-                        })
+                    if len(articles) < 5:
+                        consecutive_empties += 1
+                        delay = random.uniform(3.0, 6.0) * consecutive_empties
                     else:
-                        task = asyncio.create_task(
-                            fetch_scielo_article(aio_session, link, semaphore, stats)
-                        )
-                        all_tasks.append((task, title, link))
+                        consecutive_empties = 0
+                        delay = random.uniform(1.0, 2.5)
 
-                page += 1
-                await asyncio.sleep(delay)
+                    for art in articles:
+                        a = art.find("a", title=True)
+                        if not a:
+                            continue
+
+                        href = a.get("href", "")
+                        if not href:
+                            continue
+
+                        link = href if href.startswith("http") else f"https://search.scielo.org{href}"
+                        title_tag = a.find("strong", class_="title")
+                        title = title_tag.get_text(strip=True) if title_tag else a.get("title", "").strip()
+
+                        source_div = art.select_one("div.source")
+                        abstract_div = source_div.find_next_sibling("div", class_=False) if source_div else None
+                        inline_abstract = abstract_div.get_text(strip=True) if abstract_div else None
+
+                        stats["total"] += 1
+
+                        if inline_abstract:
+                            stats["inline_abstract"] += 1
+                            results.append({
+                                "source": "scielo",
+                                "query": query,
+                                "id": extract_pid(link),
+                                "url": link,
+                                "title": title,
+                                "abstracts": split_abstract_by_language(inline_abstract),
+                            })
+                        else:
+                            task = asyncio.create_task(
+                                fetch_scielo_article(aio_session, link, semaphore, stats)
+                            )
+                            all_tasks.append((task, title, link))
+                        
+                        pbar.update(1)
+                    page += 1
+                    await asyncio.sleep(delay)
 
         finally:
             await browser.close()
