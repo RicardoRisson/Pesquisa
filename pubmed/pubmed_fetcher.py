@@ -1,31 +1,22 @@
 import os
+import time
 from dotenv import load_dotenv
 from tqdm import tqdm
 from Bio import Entrez
+from pubmed.utils import extract_pubmed_abstracts
 
 load_dotenv()
+
 Entrez.email = os.getenv("ENTREZ_EMAIL")
 
-MAX_PUBMED = 200
+api_key = os.getenv("ENTREZ_API_KEY")
+if api_key:
+    Entrez.api_key = api_key
 
-def extract_pubmed_abstracts(article_data: dict) -> dict[str, str]:
-    abstracts = {}
+MAX_PUBMED = 2000
+BATCH_SIZE = 200
+REQUEST_DELAY = 0.11 if api_key else 0.34  # 10 req/s with key, 3 req/s without
 
-    # primary abstract — may be english or the article's original language
-    if "Abstract" in article_data:
-        lang = article_data.get("Language", ["en"])[0].lower()  # Language lives one level up
-        text = " ".join(str(x) for x in article_data["Abstract"]["AbstractText"])
-        if text:
-            abstracts[lang] = text
-
-    # OtherAbstract holds translations (e.g. portuguese, spanish)
-    for other in article_data.get("OtherAbstract", []):
-        lang = str(other.get("@Language", "unknown")).lower()
-        text = " ".join(str(x) for x in other.get("AbstractText", []))
-        if text:
-            abstracts[lang] = text
-
-    return abstracts  # e.g. {"en": "...", "pt": "...", "es": "..."}
 
 def fetch_pubmed(query, checkpoint):
     print(f"[PubMed] {query}")
@@ -37,25 +28,37 @@ def fetch_pubmed(query, checkpoint):
     if not ids:
         return []
 
-    fetch = Entrez.efetch(db="pubmed", id=ids, rettype="abstract", retmode="xml")
-    data  = Entrez.read(fetch)
     results = []
 
-    for article in tqdm(data["PubmedArticle"]):
-        medline      = article["MedlineCitation"]
-        article_data = medline["Article"]
-        pmid         = str(medline["PMID"])
-        title        = str(article_data.get("ArticleTitle", ""))
-        abstracts    = extract_pubmed_abstracts(article_data)
+    # batch into chunks of 200
+    for i in tqdm(range(0, len(ids), BATCH_SIZE)):
+        batch = ids[i:i + BATCH_SIZE]
 
-        if abstracts:
-            results.append({
-                "source":    "pubmed",
-                "query":     query,
-                "id":        pmid,
-                "title":     title,
-                "abstracts": abstracts,
-            })
-            checkpoint["done_ids"].append(pmid)
+        try:
+            fetch = Entrez.efetch(db="pubmed", id=batch, rettype="abstract", retmode="xml")
+            data = Entrez.read(fetch)
 
+            for article in data["PubmedArticle"]:
+                medline      = article["MedlineCitation"]
+                article_data = medline["Article"]
+                pmid         = str(medline["PMID"])
+                title        = str(article_data.get("ArticleTitle", ""))
+                abstracts    = extract_pubmed_abstracts(article_data)
+
+                if abstracts:
+                    results.append({
+                        "source":    "pubmed",
+                        "query":     query,
+                        "id":        pmid,
+                        "title":     title,
+                        "abstracts": abstracts,
+                    })
+                    checkpoint["done_ids"].append(pmid)
+
+        except Exception as e:
+            print(f"[PubMed] Batch {i}–{i + BATCH_SIZE} failed: {e}")
+            continue
+
+        time.sleep(REQUEST_DELAY)  # respect rate limit between batches
     return results
+
