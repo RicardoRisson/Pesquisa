@@ -28,7 +28,6 @@ def fetch_arxiv(query: str, checkpoint: dict) -> list[dict]:
             "source":    "arxiv",
             "query":     query,
             "id":        arxiv_id,
-            "url":       result.entry_id,
             "title":     result.title.strip(),
             "abstracts": {"english": abstract},  # arXiv is english-only
         })

@@ -2,11 +2,15 @@ import aiofiles
 import json
 import hashlib
 
-CLEAN_FILE = "data/dataset_clean.jsonl"
+CLASSIFIED_DIR = "data/classified"
 REPORT_FILE = "data/report.json"
 RAW_FILE = "data/dataset_raw.jsonl"
 CHECKPOINT_FILE = "logs/checkpoint.json"
 LOG_FILE = "logs/pipeline_log.jsonl"
+
+def slug(query: str) -> str:
+    """Convert query string to a safe filename."""
+    return query.lower().strip().replace(" ", "_").replace("/", "_")
 
 async def log_event(event: dict):
     async with aiofiles.open(LOG_FILE, "a") as f:

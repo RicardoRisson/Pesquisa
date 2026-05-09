@@ -3,7 +3,7 @@ import json
 from pathlib import Path
 from collections import defaultdict
 from shared.langs import normalize_lang_key
-from utils import load_jsonl, RAW_FILE, CLEAN_FILE, REPORT_FILE
+from utils import load_jsonl, slug, RAW_FILE, CLASSIFIED_DIR, REPORT_FILE
 
 def dedup(entries: list[dict]) -> tuple[list[dict], list[dict]]:
     seen = {}
@@ -36,26 +36,30 @@ def classify_languages(entry: dict) -> dict:
     return entry
 
 
-def build_report(original, deduped, dupes) -> dict:
-    lang_counts = defaultdict(int)
+def build_report(original, by_query, all_dupes) -> dict:
+    lang_counts   = defaultdict(int)
     source_counts = defaultdict(int)
-    multilingual = 0
+    query_counts  = {}
+    multilingual  = 0
 
-    for entry in deduped:
-        source_counts[entry.get("source", "unknown")] += 1
-        for lang in entry.get("languages", []):
-            lang_counts[lang] += 1
-        if entry.get("multilingual"):
-            multilingual += 1
+    for query, entries in by_query.items():
+        query_counts[query] = len(entries)
+        for entry in entries:
+            source_counts[entry.get("source", "unknown")] += 1
+            for lang in entry.get("languages", []):
+                lang_counts[lang] += 1
+            if entry.get("multilingual"):
+                multilingual += 1
 
     return {
-        "total_raw":          len(original),
-        "total_after_dedup":  len(deduped),
-        "duplicates_removed": len(dupes),
+        "total_raw":            len(original),
+        "total_after_dedup":    sum(len(v) for v in by_query.values()),
+        "duplicates_removed":   len(all_dupes),
         "multilingual_entries": multilingual,
-        "by_source":          dict(source_counts),
-        "by_language":        dict(sorted(lang_counts.items(), key=lambda x: -x[1])),
-        "duplicate_ids":      [d["id"] for d in dupes],
+        "by_query":             dict(sorted(query_counts.items())),
+        "by_source":            dict(source_counts),
+        "by_language":          dict(sorted(lang_counts.items(), key=lambda x: -x[1])),
+        "duplicate_ids":        [d["id"] for d in all_dupes],
     }
 
 
@@ -69,20 +73,29 @@ def classify():
 
     classified = [classify_languages(e) for e in deduped]
 
-    Path(CLEAN_FILE).parent.mkdir(parents=True, exist_ok=True)
+    # group by query — each query becomes its own output file
+    by_query = defaultdict(list)
+    for entry in classified:
+        query = entry.get("query", "unknown")
+        by_query[query].append(entry)
 
-    with open(CLEAN_FILE, "w", encoding="utf-8") as f:
-        for entry in classified:
-            f.write(json.dumps(entry, ensure_ascii=False) + "\n")
+    output_dir = Path(CLASSIFIED_DIR)
+    output_dir.mkdir(parents=True, exist_ok=True)
 
-    report = build_report(entries, classified, dupes)
+    for query, items in by_query.items():
+        out_path = output_dir / f"{slug(query)}.jsonl"
+        with open(out_path, "w", encoding="utf-8") as f:
+            for item in items:
+                f.write(json.dumps(item, ensure_ascii=False) + "\n")
+        print(f"[Classify] {query!r:<40} → {len(items):>5} entries → {out_path.name}")
+
+    report = build_report(entries, by_query, dupes)
     with open(REPORT_FILE, "w", encoding="utf-8") as f:
         json.dump(report, f, indent=2, ensure_ascii=False)
 
-    print(f"[Classify] Done → {CLEAN_FILE}")
-    print(f"[Classify] Report:")
+    print(f"\n[Classify] Done → {CLASSIFIED_DIR}/")
+    print(f"[Classify] Report → {REPORT_FILE}")
     print(json.dumps(report, indent=2))
-
 
 if __name__ == "__main__":
     classify() 

@@ -6,11 +6,42 @@ LANG_CODES = set(LANG_CODE_MAP.keys())
 LANG_NAMES = SCIELO_LANGS
 LANGS = LANG_NAMES | set(LANG_CODE_MAP.values())
 
+
+LABEL_FIXES = {
+    # english bleedthrough
+    "englishabstract": "english", "englishthe": "english",
+    "englishbackground": "english", "englishobjective": "english",
+    "englishobjectives": "english", "englishintroduction": "english",
+    "englishsummary": "english", "englishthis": "english",
+    "englishcontext": "english", "englishpurpose": "english",
+    "englishabastract": "english", "englishabstractbackground": "english",
+    # portuguese bleedthrough
+    "portugueseresumo": "portuguese", "portugueseo": "portuguese",
+    "portuguesea": "portuguese", "portugueseas": "portuguese",
+    "portugueseobjetivo": "portuguese", "portugueseobjetivos": "portuguese",
+    "portugueseintrodução": "portuguese", "portuguesejustificativa": "portuguese",
+    "portugueseeste": "portuguese", "portugueseobjetivou": "portuguese",
+    "portugueseos": "portuguese", "portuguesefundamento": "portuguese",
+    "portugueseembora": "portuguese", "portuguesecontexto": "portuguese",
+    "portuguesecontextualização": "portuguese", "portugueseresumofundamento": "portuguese",
+    # spanish bleedthrough
+    "spanishresumen": "spanish", "spanishla": "spanish",
+    "spanishel": "spanish", "spanishintroducción": "spanish",
+    "spanishen": "spanish", "spanishobjetivo": "spanish",
+    "spanishobjetivos": "spanish", "spanishse": "spanish",
+    "spanishlas": "spanish", "spanishlos": "spanish",
+    "spanishantecedentes": "spanish", "spanishjustificativa": "spanish",
+    "spanisheste": "spanish", "spanishfundamento": "spanish",
+    "spanishpara": "spanish", "spanishcon": "spanish",
+    "spanishdurante": "spanish", "spanishintrodución": "spanish",
+}
+
 def normalize_lang_key(lang: str) -> str:
-    """Normalize any lang key to a full name. Handles ISO codes and full names."""
     lang = lang.lower().strip()
-    if lang in LANG_CODES:                  # ISO code → full name
+    if lang in LABEL_FIXES:
+        return LABEL_FIXES[lang]
+    if lang in LANG_CODES:
         return LANG_CODE_MAP[lang]
-    if lang in LANG_NAMES:                  # already a full name
+    if lang in LANG_NAMES:
         return lang
     return "other"
