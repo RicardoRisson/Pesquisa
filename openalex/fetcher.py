@@ -9,7 +9,7 @@ load_dotenv()
 
 BASE_URL    = "https://api.openalex.org/works"
 PER_PAGE    = 200
-MAX_RESULTS = 10000
+MAX_RESULTS = 5000
 DELAY       = 1.0  # segundos entre páginas — respeita o rate limit sem chave
 
 def make_headers() -> dict:
@@ -75,15 +75,18 @@ def fetch_openalex(query: str, checkpoint: dict) -> list[dict]:
                 lang = work.get("language") or "unknown"
 
                 results.append({
-                    "source":   "openalex",
-                    "query":    query,
-                    "id":       openalex_id,
-                    "autores": [a.get("author", {}).get("display_name") for a in work.get("authorships", [])],
-                    "doi":      work.get("doi", ""),
-                    "title":    work.get("title", "").strip(),
+                    "source":    "openalex",
+                    "query":     query,
+                    "id":        openalex_id,
+                    "doi":       work.get("doi") or "",
+                    "title":     (work.get("title") or "").strip(),
+                    "authors":   [
+                        a.get("author", {}).get("display_name") or ""
+                        for a in work.get("authorships", [])
+                        if a.get("author", {}).get("display_name")
+                    ],
                     "abstracts": {lang: abstract},
                 })
-
                 pbar.update(1)
 
             total_fetched += len(works)
