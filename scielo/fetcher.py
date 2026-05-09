@@ -9,7 +9,7 @@ from bs4 import BeautifulSoup
 from collections import defaultdict
 from playwright.async_api import async_playwright, BrowserContext
 from utils import log_event
-from scielo.utils import split_abstract_by_language, extract_pid
+from scielo.utils import split_abstract_by_language, extract_pid, extract_doi, extract_doi_from_text
 from scielo.cookie import refresh_scielo_cookie
 from scielo.block_guard import fetch_with_retry, is_blocked, BLOCKED
 
@@ -63,10 +63,8 @@ async def fetch_search_page(context: BrowserContext, params: dict) -> str | None
 
 
 async def fetch_scielo_article(session, url, semaphore, stats):
-    """Fetch individual article pages with aiohttp — less CDN scrutiny on direct article URLs."""
     async with semaphore:
         html = await fetch_with_retry(session, url)
-
         if not html or html is BLOCKED:
             stats["fail"] += 1
             return None
@@ -80,8 +78,10 @@ async def fetch_scielo_article(session, url, semaphore, stats):
             return None
 
         stats["success"] += 1
-        await log_event({"event": "scielo_article", "status": "success", "url": url})
-        return abstract_tag.text.strip()
+        return {
+            "abstract": abstract_tag.text.strip(),
+            "doi":      extract_doi(soup),   # extract alongside abstract
+        }
 
 
 async def fetch_scielo(query: str) -> list:
@@ -167,6 +167,9 @@ async def fetch_scielo(query: str) -> list:
                         title_tag = a.find("strong", class_="title")
                         title = title_tag.get_text(strip=True) if title_tag else a.get("title", "").strip()
 
+                        # DOI is in the article card text on the search page
+                        doi = extract_doi_from_text(art.get_text())         # add this
+
                         source_div = art.select_one("div.source")
                         abstract_div = source_div.find_next_sibling("div", class_=False) if source_div else None
                         inline_abstract = abstract_div.get_text(strip=True) if abstract_div else None
@@ -176,18 +179,18 @@ async def fetch_scielo(query: str) -> list:
                         if inline_abstract:
                             stats["inline_abstract"] += 1
                             results.append({
-                                "source": "scielo",
-                                "query": query,
-                                "id": extract_pid(link),
-                                "url": link,
-                                "title": title,
+                                "source":    "scielo",
+                                "query":     query,
+                                "id":        extract_pid(link),
+                                "doi":       doi,                          # add this
+                                "title":     title,
                                 "abstracts": split_abstract_by_language(inline_abstract),
                             })
                         else:
                             task = asyncio.create_task(
                                 fetch_scielo_article(aio_session, link, semaphore, stats)
                             )
-                            all_tasks.append((task, title, link))
+                            all_tasks.append((task, title, link, doi))     # pass doi along
                         
                         pbar.update(1)
                     page += 1
@@ -197,17 +200,17 @@ async def fetch_scielo(query: str) -> list:
             await browser.close()
             await aio_session.close()
 
-    gathered = await asyncio.gather(*[t for t, _, _ in all_tasks], return_exceptions=True)
-    for (_, title, link), abstract in zip(all_tasks, gathered):
+    gathered = await asyncio.gather(*[t for t, _, _, _ in all_tasks], return_exceptions=True)
+    for (_, title, link, doi), abstract in zip(all_tasks, gathered):
         if isinstance(abstract, Exception) or not abstract:
             stats["no_abstract"] += 1
         else:
             results.append({
-                "source": "scielo",
-                "query": query,
-                "id": extract_pid(link),
-                "url": link,
-                "title": title,
+                "source":    "scielo",
+                "query":     query,
+                "id":        extract_pid(link),
+                "doi":       doi,                          # already extracted from search page
+                "title":     title,
                 "abstracts": split_abstract_by_language(abstract),
             })
 

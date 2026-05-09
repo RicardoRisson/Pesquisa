@@ -48,3 +48,12 @@ def split_abstract_by_language(raw: str) -> dict[str, str]:
 def extract_pid(url: str) -> str:
     pid = urllib.parse.parse_qs(urllib.parse.urlparse(url).query).get("pid", [None])[0]
     return pid or url
+
+def extract_doi(soup) -> str:
+    tag = soup.find("meta", attrs={"name": "citation_doi"})
+    return tag["content"].strip() if tag and tag.get("content") else ""
+
+def extract_doi_from_text(text: str) -> str:
+    """Extract DOI from raw text containing 'DOI: 10.xxxx/...'"""
+    match = re.search(r'DOI:\s*(10\.\S+)', text, re.IGNORECASE)
+    return match.group(1).rstrip(".,)") if match else ""

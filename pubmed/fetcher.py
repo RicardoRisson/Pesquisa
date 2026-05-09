@@ -3,7 +3,7 @@ import time
 from dotenv import load_dotenv
 from tqdm import tqdm
 from Bio import Entrez
-from pubmed.utils import extract_pubmed_abstracts
+from pubmed.utils import extract_pubmed_abstracts, extract_doi
 
 load_dotenv()
 
@@ -48,13 +48,13 @@ def fetch_pubmed(query, checkpoint):
                         "source":    "pubmed",
                         "query":     query,
                         "id":        pmid,
+                        "doi":       extract_doi(article_data),   # add this
                         "title":     title,
                         "abstracts": abstracts,
                     })
                     checkpoint["done_ids"].append(pmid)
 
         except Exception as e:
-            print(f"[PubMed] Batch {i}–{i + BATCH_SIZE} failed: {e}")
             continue
 
         time.sleep(REQUEST_DELAY)  # respect rate limit between batches

@@ -8,16 +8,14 @@ from utils import load_jsonl, slug, RAW_FILE, CLASSIFIED_DIR, REPORT_FILE
 def dedup(entries: list[dict]) -> tuple[list[dict], list[dict]]:
     seen = {}
     dupes = []
-
     for entry in entries:
-        eid = entry.get("id")
-        if not eid:
+        key = entry.get("doi") or entry.get("id")
+        if not key:
             continue
-        if eid in seen:
+        if key in seen:
             dupes.append(entry)
         else:
-            seen[eid] = entry
-
+            seen[key] = entry
     return list(seen.values()), dupes
 
 

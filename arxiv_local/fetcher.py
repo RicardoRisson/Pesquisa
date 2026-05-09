@@ -2,7 +2,7 @@
 import arxiv
 from tqdm import tqdm
 
-MAX_ARXIV = 20000
+MAX_ARXIV = 10000
 
 def fetch_arxiv(query: str, checkpoint: dict) -> list[dict]:
     client = arxiv.Client(delay_seconds=3.0)
@@ -28,6 +28,7 @@ def fetch_arxiv(query: str, checkpoint: dict) -> list[dict]:
             "source":    "arxiv",
             "query":     query,
             "id":        arxiv_id,
+            "doi":       result.doi or "",
             "title":     result.title.strip(),
             "abstracts": {"english": abstract},  # arXiv is english-only
         })

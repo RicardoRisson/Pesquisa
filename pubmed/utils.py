@@ -43,3 +43,10 @@ def extract_pubmed_abstracts(article_data: dict) -> dict[str, str]:
             abstracts[lang] = text
 
     return abstracts  # e.g. {"en": "...", "pt": "...", "es": "..."}
+
+def extract_doi(article_data: dict) -> str:
+    """Extract DOI from PubMed ELocationID list."""
+    for loc in article_data.get("ELocationID", []):
+        if str(loc.attributes.get("EIdType", "")).lower() == "doi":
+            return str(loc).strip()
+    return ""
