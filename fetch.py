@@ -1,23 +1,24 @@
 import asyncio
 import argparse
 from utils import save_checkpoint, save_jsonl_async, load_checkpoint, hash_text
-from pubmed.pubmed_fetcher import fetch_pubmed
-from scielo.scielo_fetcher import fetch_scielo
-
+from pubmed.fetcher import fetch_pubmed
+from scielo.fetcher import fetch_scielo
+from arxiv_local.fetcher import fetch_arxiv
 import os
 from dotenv import load_dotenv
 
 load_dotenv()
 QUERIES = [q.strip() for q in os.getenv("QUERIES", "").split(",") if q.strip()]
 
-# registry — add new fetchers here
 FETCHERS = {
     "pubmed": lambda q, checkpoint: asyncio.get_event_loop().run_in_executor(
         None, fetch_pubmed, q, checkpoint
     ),
     "scielo": lambda q, checkpoint: fetch_scielo(q),
+    "arxiv":  lambda q, checkpoint: asyncio.get_event_loop().run_in_executor(
+        None, fetch_arxiv, q, checkpoint
+    ),
 }
-
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Abstract scraper")
@@ -53,7 +54,7 @@ async def main():
 
             await save_jsonl_async(item)
             checkpoint["done_ids"].append(item_hash)
-            
+
         save_checkpoint(checkpoint)
         print(f"[DONE] {q} → {len(combined)} artigos")
 

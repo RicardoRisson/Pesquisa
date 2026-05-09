@@ -11,3 +11,4 @@ nltk
 langdetect
 Brotli
 argparse
+arxiv

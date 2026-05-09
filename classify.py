@@ -59,7 +59,7 @@ def build_report(original, deduped, dupes) -> dict:
     }
 
 
-def main():
+def classify():
     print(f"[Classify] Loading {RAW_FILE}...")
     entries = load_jsonl(RAW_FILE)
     print(f"[Classify] Loaded {len(entries)} entries")
@@ -85,4 +85,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main() 
+    classify() 
