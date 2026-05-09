@@ -57,3 +57,13 @@ def extract_doi_from_text(text: str) -> str:
     """Extract DOI from raw text containing 'DOI: 10.xxxx/...'"""
     match = re.search(r'DOI:\s*(10\.\S+)', text, re.IGNORECASE)
     return match.group(1).rstrip(".,)") if match else ""
+
+def extract_authors_from_card(art) -> list[str]:
+    authors_div = art.select_one("div.authors")
+    if not authors_div:
+        return []
+    return [
+        a.get_text(strip=True)
+        for a in authors_div.find_all("a")
+        if a.get_text(strip=True)
+    ]

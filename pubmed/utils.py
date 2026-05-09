@@ -50,3 +50,13 @@ def extract_doi(article_data: dict) -> str:
         if str(loc.attributes.get("EIdType", "")).lower() == "doi":
             return str(loc).strip()
     return ""
+
+def extract_authors(article_data: dict) -> list[str]:
+    authors = []
+    for author in article_data.get("AuthorList", []):
+        last  = author.get("LastName", "")
+        fore  = author.get("ForeName", "")
+        name  = f"{last}, {fore}".strip(", ")
+        if name:
+            authors.append(name)
+    return authors

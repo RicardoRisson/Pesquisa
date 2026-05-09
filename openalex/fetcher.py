@@ -78,6 +78,7 @@ def fetch_openalex(query: str, checkpoint: dict) -> list[dict]:
                     "source":   "openalex",
                     "query":    query,
                     "id":       openalex_id,
+                    "autores": [a.get("author", {}).get("display_name") for a in work.get("authorships", [])],
                     "doi":      work.get("doi", ""),
                     "title":    work.get("title", "").strip(),
                     "abstracts": {lang: abstract},

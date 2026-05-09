@@ -215,5 +215,4 @@ async def fetch_scielo(query: str) -> list:
             })
 
     await log_event({"event": "scielo_summary", "query": query, "stats": dict(stats)})
-    print(f"[STATS] {query}: {dict(stats)}")
     return results

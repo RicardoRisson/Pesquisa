@@ -27,6 +27,7 @@ def fetch_arxiv(query: str, checkpoint: dict) -> list[dict]:
         results.append({
             "source":    "arxiv",
             "query":     query,
+            "authors":   [a.name for a in result.authors],
             "id":        arxiv_id,
             "doi":       result.doi or "",
             "title":     result.title.strip(),
