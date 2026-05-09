@@ -1,25 +1,28 @@
 LANG_CODE_MAP = {
     # germanic
-    "en": "english", "de": "german", "nl": "dutch", "sv": "swedish",
-    "no": "norwegian", "da": "danish", "fi": "finnish", "af": "afrikaans",
+    "eng": "english", "deu": "german", "ger": "german", "nld": "dutch",
+    "dut": "dutch", "swe": "swedish", "nor": "norwegian", "dan": "danish",
+    "fin": "finnish", "afr": "afrikaans",
     # romance
-    "pt": "portuguese", "es": "spanish", "fr": "french", "it": "italian",
-    "ro": "romanian", "ca": "catalan", "gl": "galician",
+    "por": "portuguese", "spa": "spanish", "fra": "french", "fre": "french",
+    "ita": "italian", "ron": "romanian", "rum": "romanian", "cat": "catalan",
+    "glg": "galician",
     # slavic
-    "ru": "russian", "pl": "polish", "cs": "czech", "sk": "slovak",
-    "uk": "ukrainian", "bg": "bulgarian", "sr": "serbian",
-    "hr": "croatian", "sl": "slovenian",
+    "rus": "russian", "pol": "polish", "ces": "czech", "cze": "czech",
+    "slk": "slovak", "slo": "slovak", "ukr": "ukrainian", "bul": "bulgarian",
+    "srp": "serbian", "hrv": "croatian", "slv": "slovenian",
     # semitic
-    "ar": "arabic", "he": "hebrew",
+    "ara": "arabic", "heb": "hebrew",
     # east asian
-    "zh": "chinese", "ja": "japanese", "ko": "korean",
+    "zho": "chinese", "chi": "chinese", "jpn": "japanese", "kor": "korean",
     # south/southeast asian
-    "hi": "hindi", "bn": "bengali", "ta": "tamil", "te": "telugu",
-    "ml": "malayalam", "th": "thai", "vi": "vietnamese",
-    "id": "indonesian", "ms": "malay",
+    "hin": "hindi", "ben": "bengali", "tam": "tamil", "tel": "telugu",
+    "mal": "malayalam", "tha": "thai", "vie": "vietnamese", "ind": "indonesian",
+    "msa": "malay", "may": "malay",
     # other
-    "tr": "turkish", "fa": "persian", "el": "greek", "hu": "hungarian",
-    "ka": "georgian", "hy": "armenian", "sw": "swahili", "tl": "tagalog",
+    "tur": "turkish", "fas": "persian", "per": "persian", "ell": "greek",
+    "gre": "greek", "hun": "hungarian", "kat": "georgian", "hye": "armenian",
+    "arm": "armenian", "swa": "swahili", "tgl": "tagalog",
 }
 
 def extract_pubmed_abstracts(article_data: dict) -> dict[str, str]:
